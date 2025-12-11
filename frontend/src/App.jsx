@@ -430,6 +430,25 @@ function App() {
           Inicie um novo jogo acima para começar a batalha.
         </p>
       )}
+
+<footer
+  style={{
+    marginTop: "40px",
+    padding: "20px",
+    textAlign: "center",
+    fontSize: "0.9rem",
+    color: "#94a3b8",
+    opacity: 0.8,
+    borderTop: "1px solid #1e293b",
+  }}
+>
+  Projeto desenvolvido por <strong>Kevin de Freitas Minervino</strong> ·  
+  Criado para estudo e portfólio · 2025  
+  <br />
+  Backend: FastAPI (Render) · Frontend: React (Vercel)
+</footer>
+
+
     </div>
   );
 }
