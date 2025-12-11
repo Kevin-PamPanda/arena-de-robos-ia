@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -30,12 +30,22 @@ function App() {
       });
 
       if (!resp.ok) {
-        const data = await resp.json();
-        throw new Error(data.detail || "Erro ao iniciar jogo");
+        let msg = "Erro ao iniciar jogo";
+        try {
+          const data = await resp.json();
+          msg = data.detail || msg;
+        } catch (_) {}
+        throw new Error(msg);
       }
 
       const data = await resp.json();
-      setGameState(data);
+
+      // Normaliza o estado para evitar undefined
+      setGameState({
+        ...data,
+        arena: data.arena || { largura: 16, altura: 5 },
+        logs: Array.isArray(data.logs) ? data.logs : [],
+      });
       setCommandText("");
     } catch (err) {
       console.error(err);
@@ -62,12 +72,23 @@ function App() {
       });
 
       if (!resp.ok) {
-        const data = await resp.json();
-        throw new Error(data.detail || "Erro ao enviar comando");
+        let msg = "Erro ao enviar comando";
+        try {
+          const data = await resp.json();
+          msg = data.detail || msg;
+        } catch (_) {}
+        throw new Error(msg);
       }
 
       const data = await resp.json();
-      setGameState(data);
+      setGameState((prev) => {
+        const merged = { ...(prev || {}), ...data };
+        return {
+          ...merged,
+          arena: merged.arena || { largura: 16, altura: 5 },
+          logs: Array.isArray(merged.logs) ? merged.logs : [],
+        };
+      });
     } catch (err) {
       console.error(err);
       setErro(err.message || "Erro desconhecido ao enviar comando");
@@ -77,7 +98,11 @@ function App() {
   }
 
   async function executarTurno() {
+    // usado pelo auto-loop
     if (!temJogo) return;
+    if (loading) return;
+    if (jogoFinalizado) return;
+
     setErro("");
     setLoading(true);
 
@@ -87,12 +112,23 @@ function App() {
       });
 
       if (!resp.ok) {
-        const data = await resp.json();
-        throw new Error(data.detail || "Erro ao executar turno");
+        let msg = "Erro ao executar turno";
+        try {
+          const data = await resp.json();
+          msg = data.detail || msg;
+        } catch (_) {}
+        throw new Error(msg);
       }
 
       const data = await resp.json();
-      setGameState(data);
+      setGameState((prev) => {
+        const merged = { ...(prev || {}), ...data };
+        return {
+          ...merged,
+          arena: merged.arena || { largura: 16, altura: 5 },
+          logs: Array.isArray(merged.logs) ? merged.logs : [],
+        };
+      });
     } catch (err) {
       console.error(err);
       setErro(err.message || "Erro desconhecido ao executar turno");
@@ -111,22 +147,36 @@ function App() {
   const jogoFinalizado =
     gameState && gameState.status && gameState.status !== "running";
 
+  const arenaData = gameState?.arena || { largura: 16, altura: 5 };
+  const logs = Array.isArray(gameState?.logs) ? gameState.logs : [];
+
+  // 🔁 Loop automático de turnos a cada 10s
+  useEffect(() => {
+    if (!temJogo || jogoFinalizado) return;
+
+    const id = setInterval(() => {
+      executarTurno();
+    }, 2000); // 2 segundos
+
+    return () => clearInterval(id);
+  }, [temJogo, jogoFinalizado, gameState?.turno]); // reinicia o timer quando o turno muda
+
   return (
     <div
       style={{
         minHeight: "100vh",
         padding: "16px",
-        background: "#0b1020",
+        background: "#020617",
         color: "#f5f5f5",
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      <h1 style={{ textAlign: "center", marginBottom: "8px" }}>
+      <h1 style={{ textAlign: "center", marginBottom: "8px", fontSize: "2.4rem" }}>
         ARIA – Arena de Robôs IA (Frontend React)
       </h1>
       <p style={{ textAlign: "center", marginBottom: "24px", opacity: 0.8 }}>
         Controle seu robô via API FastAPI – escolha o robô, envie comandos e
-        avance turnos.
+        acompanhe os turnos automáticos.
       </p>
 
       {/* Seção de novo jogo */}
@@ -135,9 +185,10 @@ function App() {
           maxWidth: "800px",
           margin: "0 auto 24px auto",
           padding: "16px",
-          borderRadius: "12px",
-          background: "#151b2f",
-          boxShadow: "0 0 16px rgba(0,0,0,0.4)",
+          borderRadius: "16px",
+          background: "#020617",
+          boxShadow: "0 0 24px rgba(15,23,42,0.9)",
+          border: "1px solid #1e293b",
         }}
       >
         <h2 style={{ marginBottom: "8px" }}>Novo jogo</h2>
@@ -159,9 +210,9 @@ function App() {
               onChange={(e) => setRoboEscolha(e.target.value)}
               style={{
                 padding: "6px 8px",
-                borderRadius: "6px",
-                border: "1px solid #444",
-                background: "#0f1424",
+                borderRadius: "8px",
+                border: "1px solid #334155",
+                background: "#020617",
                 color: "#f5f5f5",
               }}
             >
@@ -181,9 +232,9 @@ function App() {
               onChange={(e) => setNomeRobo(e.target.value)}
               style={{
                 padding: "6px 8px",
-                borderRadius: "6px",
-                border: "1px solid #444",
-                background: "#0f1424",
+                borderRadius: "8px",
+                border: "1px solid #334155",
+                background: "#020617",
                 color: "#f5f5f5",
               }}
               placeholder="Ex: Atlas, Bolt..."
@@ -194,13 +245,14 @@ function App() {
             type="submit"
             disabled={loading}
             style={{
-              padding: "8px 16px",
-              borderRadius: "8px",
+              padding: "10px 18px",
+              borderRadius: "999px",
               border: "none",
-              background: loading ? "#444" : "#3b82f6",
+              background: loading ? "#475569" : "#3b82f6",
               color: "#fff",
               cursor: loading ? "default" : "pointer",
-              marginTop: "20px",
+              marginTop: "22px",
+              fontWeight: 600,
             }}
           >
             {loading ? "Carregando..." : "Iniciar jogo"}
@@ -215,7 +267,7 @@ function App() {
             maxWidth: "800px",
             margin: "0 auto 16px auto",
             padding: "10px 14px",
-            borderRadius: "8px",
+            borderRadius: "10px",
             background: "#7f1d1d",
           }}
         >
@@ -227,10 +279,10 @@ function App() {
       {temJogo && (
         <section
           style={{
-            maxWidth: "1000px",
+            maxWidth: "1100px",
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "1.2fr 0.8fr",
+            gridTemplateColumns: "1.4fr 0.9fr",
             gap: "16px",
           }}
         >
@@ -238,15 +290,20 @@ function App() {
           <div
             style={{
               padding: "16px",
-              borderRadius: "12px",
-              background: "#151b2f",
-              boxShadow: "0 0 16px rgba(0,0,0,0.4)",
+              borderRadius: "16px",
+              background: "#020617",
+              boxShadow: "0 0 24px rgba(15,23,42,0.9)",
+              border: "1px solid #1e293b",
             }}
           >
             <h2 style={{ marginBottom: "4px" }}>Estado da batalha</h2>
-            <p style={{ marginBottom: "12px", opacity: 0.8 }}>
+            <p style={{ marginBottom: "4px", opacity: 0.8 }}>
               Turno: <strong>{gameState.turno}</strong> | Status:{" "}
               <strong>{statusLabel(gameState.status)}</strong>
+            </p>
+            <p style={{ marginBottom: "12px", opacity: 0.7, fontSize: "0.85rem" }}>
+              Os turnos são executados automaticamente a cada 10 segundos enquanto
+              a batalha estiver em andamento.
             </p>
 
             <div
@@ -259,6 +316,25 @@ function App() {
             >
               <RoboCard title="Jogador" robo={gameState.jogador} destaque />
               <RoboCard title="Adversário" robo={gameState.adversario} />
+            </div>
+
+            {/* Arena visual em grid */}
+            <div
+              style={{
+                marginBottom: "16px",
+                padding: "12px",
+                borderRadius: "12px",
+                background: "#020617",
+                border: "1px solid #1e293b",
+              }}
+            >
+              <h3 style={{ marginBottom: "8px" }}>Arena</h3>
+              <ArenaGrid
+                largura={arenaData.largura}
+                altura={arenaData.altura}
+                jogador={gameState.jogador}
+                adversario={gameState.adversario}
+              />
             </div>
 
             <form
@@ -274,8 +350,8 @@ function App() {
                   flex: 1,
                   padding: "8px 10px",
                   borderRadius: "8px",
-                  border: "1px solid #444",
-                  background: "#0f1424",
+                  border: "1px solid #334155",
+                  background: "#020617",
                   color: "#f5f5f5",
                 }}
               />
@@ -286,33 +362,19 @@ function App() {
                   padding: "8px 12px",
                   borderRadius: "8px",
                   border: "none",
-                  background: jogoFinalizado ? "#444" : "#22c55e",
+                  background: jogoFinalizado ? "#475569" : "#22c55e",
                   color: "#fff",
                   cursor:
                     loading || !commandText.trim() || jogoFinalizado
                       ? "default"
                       : "pointer",
                   whiteSpace: "nowrap",
+                  fontWeight: 600,
                 }}
               >
                 Enviar comando
               </button>
             </form>
-
-            <button
-              onClick={executarTurno}
-              disabled={loading || jogoFinalizado}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "none",
-                background: jogoFinalizado ? "#444" : "#eab308",
-                color: "#000",
-                cursor: loading || jogoFinalizado ? "default" : "pointer",
-              }}
-            >
-              {jogoFinalizado ? "Batalha encerrada" : "Executar turno"}
-            </button>
 
             {jogoFinalizado && (
               <p style={{ marginTop: "10px", color: "#22c55e" }}>
@@ -325,15 +387,16 @@ function App() {
           <div
             style={{
               padding: "16px",
-              borderRadius: "12px",
-              background: "#111827",
-              boxShadow: "0 0 16px rgba(0,0,0,0.4)",
+              borderRadius: "16px",
+              background: "#020617",
+              boxShadow: "0 0 24px rgba(15,23,42,0.9)",
+              border: "1px solid #1e293b",
               maxHeight: "420px",
               overflowY: "auto",
             }}
           >
             <h3 style={{ marginBottom: "8px" }}>Logs</h3>
-            {gameState.logs.length === 0 ? (
+            {logs.length === 0 ? (
               <p style={{ opacity: 0.7 }}>Nenhum log ainda.</p>
             ) : (
               <ul
@@ -344,13 +407,13 @@ function App() {
                   fontSize: "0.9rem",
                 }}
               >
-                {gameState.logs.map((log, idx) => (
+                {logs.map((log, idx) => (
                   <li
                     key={idx}
                     style={{
                       marginBottom: "6px",
                       paddingBottom: "4px",
-                      borderBottom: "1px solid rgba(255,255,255,0.05)",
+                      borderBottom: "1px solid rgba(148,163,184,0.1)",
                     }}
                   >
                     {log}
@@ -383,15 +446,15 @@ function RoboCard({ title, robo, destaque = false }) {
         flex: 1,
         minWidth: "230px",
         padding: "12px",
-        borderRadius: "10px",
-        border: destaque ? "1px solid #3b82f6" : "1px solid #374151",
-        background: "#0f172a",
+        borderRadius: "12px",
+        border: destaque ? "1px solid #3b82f6" : "1px solid #1f2937",
+        background: "#020617",
       }}
     >
       <h3 style={{ marginBottom: "4px" }}>
         {title}: {robo.nome}
       </h3>
-      <p style={{ marginBottom: "4px", fontSize: "0.9rem", opacity: 0.8 }}>
+      <p style={{ marginBottom: "4px", fontSize: "0.9rem", opacity: 0.85 }}>
         Cor: {robo.cor} | ATK: {robo.ataque} | DEF: {robo.defesa} | VEL:{" "}
         {robo.velocidade}
       </p>
@@ -405,8 +468,9 @@ function RoboCard({ title, robo, destaque = false }) {
             width: "100%",
             height: "8px",
             borderRadius: "999px",
-            background: "#1f2937",
+            background: "#020617",
             overflow: "hidden",
+            border: "1px solid #1f2937",
           }}
         >
           <div
@@ -424,9 +488,69 @@ function RoboCard({ title, robo, destaque = false }) {
           />
         </div>
       </div>
-      <p style={{ fontSize: "0.8rem", opacity: 0.7, marginTop: "4px" }}>
+      <p style={{ fontSize: "0.8rem", opacity: 0.75, marginTop: "4px" }}>
         Posição: ({robo.x}, {robo.y})
       </p>
+    </div>
+  );
+}
+
+function ArenaGrid({ largura, altura, jogador, adversario }) {
+  const w = Number.isFinite(largura) ? largura : 16;
+  const h = Number.isFinite(altura) ? altura : 5;
+
+  const cells = [];
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const isJogador = jogador?.x === x && jogador?.y === y;
+      const isAdversario = adversario?.x === x && adversario?.y === y;
+
+      let bg = "#020617";
+      let border = "1px solid #1e293b";
+      let content = "";
+
+      if (isJogador && isAdversario) {
+        bg = "#f97316"; // os dois na mesma célula (raro)
+        content = "X";
+      } else if (isJogador) {
+        bg = "#22c55e";
+        content = "J";
+      } else if (isAdversario) {
+        bg = "#ef4444";
+        content = "A";
+      }
+
+      cells.push(
+        <div
+          key={`${x}-${y}`}
+          style={{
+            width: "22px",
+            height: "22px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "0.7rem",
+            border,
+            background: bg,
+          }}
+        >
+          {content}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${w}, 22px)`,
+        gap: "2px",
+        justifyContent: "center",
+      }}
+    >
+      {cells}
     </div>
   );
 }

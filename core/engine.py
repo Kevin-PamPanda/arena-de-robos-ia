@@ -56,8 +56,8 @@ class GameState:
         self.logs: List[str] = []
 
         # posição inicial
-        self.jogador.set_posicao(2, arena.altura // 2, arena)
-        self.adversario.set_posicao(arena.largura - 3, arena.altura // 2, arena)
+        self.jogador.set_posicao(2, 1, arena)
+        self.adversario.set_posicao(arena.largura - 3, arena.altura - 2, arena)
 
         self.logs.append(
             f"Iniciando batalha: {self.jogador.nome} vs {self.adversario.nome}."
