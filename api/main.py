@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from fastapi.middleware.cors import CORSMiddleware
+
+
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -10,6 +13,17 @@ from core.engine import GameState
 
 
 app = FastAPI(title="ARIA - Arena de Robôs IA API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Por enquanto vamos manter um único jogo em memória
 current_game: Optional[GameState] = None
