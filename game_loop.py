@@ -1,10 +1,14 @@
-from models import Robo, Arena
 import random
 import time
+
+import pygame
+
+from models import Robo, Arena
 
 # -----------------------------------------
 # Criação de robôs e arena
 # -----------------------------------------
+
 
 def criar_robo_jogador():
     print("Escolha seu robô inicial:")
@@ -39,8 +43,82 @@ def criar_arena():
 
 
 # -----------------------------------------
+# Pygame – janela e desenho
+# -----------------------------------------
+
+
+def iniciar_pygame(arena: Arena):
+    pygame.init()
+    largura_tela = 800
+    altura_tela = 400
+    tela = pygame.display.set_mode((largura_tela, altura_tela))
+    pygame.display.set_caption("ARIA - Arena de Robôs IA")
+    fonte = pygame.font.SysFont(None, 24)
+    clock = pygame.time.Clock()
+    return tela, fonte, clock
+
+
+def desenhar_arena(tela, arena: Arena, jogador: Robo, adversario: Robo, fonte, turno: int):
+    largura_tela, altura_tela = tela.get_size()
+
+    cor_fundo = (90, 70, 50)    # marrom
+    cor_arena = (160, 160, 160) # cinza
+    cor_borda = (0, 0, 0)
+
+    tela.fill(cor_fundo)
+
+    margem = 60
+    arena_larg_px = largura_tela - 2 * margem
+    arena_alt_px = altura_tela - 2 * margem
+    arena_rect = pygame.Rect(margem, margem, arena_larg_px, arena_alt_px)
+
+    # Área da arena
+    pygame.draw.rect(tela, cor_arena, arena_rect)
+    pygame.draw.rect(tela, cor_borda, arena_rect, 3)
+
+    # Tamanho de cada "célula" lógica
+    cell_w = arena_larg_px / arena.largura
+    cell_h = arena_alt_px / arena.altura
+
+    def desenhar_robo(robo: Robo):
+        cores = {
+            "vermelho": (220, 60, 60),
+            "verde": (60, 220, 60),
+            "azul": (80, 80, 220),
+            "branco": (230, 230, 230),
+        }
+        cor = cores.get(robo.cor, (200, 200, 200))
+
+        cx = arena_rect.left + robo.x * cell_w + cell_w / 2
+        cy = arena_rect.top + robo.y * cell_h + cell_h / 2
+
+        raio = int(min(cell_w, cell_h) / 3)
+        pygame.draw.circle(tela, cor, (int(cx), int(cy)), raio)
+        pygame.draw.circle(tela, cor_borda, (int(cx), int(cy)), raio, 2)
+
+    desenhar_robo(jogador)
+    desenhar_robo(adversario)
+
+    # HUD
+    hud1 = fonte.render(
+        f"{jogador.nome} HP {jogador.hp_atual}/{jogador.hp_max}", True, (255, 255, 255)
+    )
+    hud2 = fonte.render(
+        f"{adversario.nome} HP {adversario.hp_atual}/{adversario.hp_max}",
+        True,
+        (255, 255, 255),
+    )
+    hud_turno = fonte.render(f"Turno {turno}", True, (255, 255, 0))
+
+    tela.blit(hud1, (20, 10))
+    tela.blit(hud2, (largura_tela - hud2.get_width() - 20, 10))
+    tela.blit(hud_turno, (largura_tela / 2 - hud_turno.get_width() / 2, 10))
+
+
+# -----------------------------------------
 # Interpretação de comandos do jogador
 # -----------------------------------------
+
 
 def interpretar_comando(texto: str) -> dict:
     """
@@ -78,7 +156,11 @@ def interpretar_comando(texto: str) -> dict:
 
 
 def obter_comando_do_jogador(robo_jogador: Robo):
-    print("\n💬 Oriente seu robô (ex: 'focar no ataque', 'focar mais na defesa', 'tentar esquivar', 'esquiva e contra-ataca'):")
+    print(
+        "\n💬 Oriente seu robô "
+        "(ex: 'focar no ataque', 'focar mais na defesa', "
+        "'tentar esquivar', 'esquiva e contra-ataca'):"
+    )
     texto = input("Comando (ou deixe vazio para manter): ")
 
     prefs = interpretar_comando(texto)
@@ -93,10 +175,11 @@ def obter_comando_do_jogador(robo_jogador: Robo):
 
 
 # -----------------------------------------
-# Simulação de batalha com arena
+# Simulação de batalha com arena + visual
 # -----------------------------------------
 
-def mostrar_status(jogador: Robo, adversario: Robo, arena: Arena, turno: int):
+
+def mostrar_status_terminal(jogador: Robo, adversario: Robo, arena: Arena, turno: int):
     print(f"\n----- TURNO {turno} -----")
     print(
         f"{jogador.nome}: HP {jogador.hp_atual}/{jogador.hp_max} "
@@ -108,7 +191,7 @@ def mostrar_status(jogador: Robo, adversario: Robo, arena: Arena, turno: int):
     print(f"Distância entre eles: {dist}")
 
 
-def simular_batalha(jogador: Robo, adversario: Robo, arena: Arena):
+def simular_batalha(jogador: Robo, adversario: Robo, arena: Arena, tela, fonte, clock):
     print("\n🔥 A BATALHA VAI COMEÇAR! 🔥")
     print(
         f"{jogador.nome} (HP {jogador.hp_atual})  "
@@ -123,9 +206,22 @@ def simular_batalha(jogador: Robo, adversario: Robo, arena: Arena):
     obter_comando_do_jogador(jogador)
 
     turnos = 1
+    rodando = True
 
-    while jogador.esta_vivo() and adversario.esta_vivo():
-        mostrar_status(jogador, adversario, arena, turnos)
+    # Primeiro desenho antes dos turnos
+    desenhar_arena(tela, arena, jogador, adversario, fonte, turnos)
+    pygame.display.flip()
+
+    while jogador.esta_vivo() and adversario.esta_vivo() and rodando:
+        # Eventos do Pygame (fechar janela, etc.)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                rodando = False
+
+        if not rodando:
+            break
+
+        mostrar_status_terminal(jogador, adversario, arena, turnos)
 
         # A cada turno, oferece opção de mudar a orientação
         mudar = input("Quer mudar a orientação do seu robô? (s/N): ").strip().lower()
@@ -149,12 +245,15 @@ def simular_batalha(jogador: Robo, adversario: Robo, arena: Arena):
             if acao == "atacar":
                 if dist_atual <= 1:
                     dano = robo.atacar(alvo)
-                    print(f"{robo.nome} ATACA! Causa {dano} de dano em {alvo.nome}.")
+                    print(
+                        f"{robo.nome} ATACA! Causa {dano} de dano em {alvo.nome}."
+                    )
                 else:
                     robo.mover_em_direcao(alvo, arena, aproximar=True)
                     print(
                         f"{robo.nome} se aproxima de {alvo.nome} "
-                        f"e vai para {robo.posicao()} (distância {arena.distancia(robo, alvo)})."
+                        f"e vai para {robo.posicao()} "
+                        f"(distância {arena.distancia(robo, alvo)})."
                     )
 
             elif acao == "defender":
@@ -168,15 +267,19 @@ def simular_batalha(jogador: Robo, adversario: Robo, arena: Arena):
                     f"{robo.nome} recua para {robo.posicao()} "
                     f"(distância {arena.distancia(robo, alvo)})."
                 )
-                # Podemos, no futuro, usar essa ação para reduzir chance de ser acertado
 
             print(
                 f"{alvo.nome} agora tem {alvo.hp_atual} HP "
                 f"e está em {alvo.posicao()}."
             )
 
+        # Atualiza visual
+        desenhar_arena(tela, arena, jogador, adversario, fonte, turnos)
+        pygame.display.flip()
+
         turnos += 1
-        time.sleep(0.8)
+        clock.tick(60)
+        time.sleep(0.3)
 
     print("\n💥 FIM DA BATALHA! 💥")
 
@@ -191,4 +294,8 @@ def iniciar_jogo():
     jogador = criar_robo_jogador()
     adversario = criar_robo_adversario()
 
-    simular_batalha(jogador, adversario, arena)
+    tela, fonte, clock = iniciar_pygame(arena)
+
+    simular_batalha(jogador, adversario, arena, tela, fonte, clock)
+
+    pygame.quit()
