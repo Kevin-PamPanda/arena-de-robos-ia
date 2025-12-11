@@ -30,16 +30,140 @@ def criar_robo_jogador():
         return Robo(nome, "azul", 1, 1, 4, "velocista")
 
 
-def criar_robo_adversario():
-    """
-    Adversário temporário para as fases iniciais.
-    Depois vamos substituir pelo gerador procedural da Fase 5.
-    """
-    return Robo("Adversário", "branco", 2, 2, 2, "agressivo")
-
-
 def criar_arena():
     return Arena(largura=16, altura=5)
+
+
+# -----------------------------------------
+# Lógica de progressão da campanha
+# -----------------------------------------
+
+# Status máximo do adversário por partida (1 a 10)
+STATUS_MAX_POR_PARTIDA = [6, 7, 8, 10, 11, 12, 14, 15, 16, 18]
+
+
+def obter_status_maximo(partida: int) -> int:
+    """
+    Retorna o status máximo da partida (1 a 10).
+    Usa a tabela acima, baseada no exemplo do documento.
+    """
+    indice = max(1, min(partida, 10)) - 1
+    return STATUS_MAX_POR_PARTIDA[indice]
+
+
+def gerar_stats_aleatorios(status_max: int) -> tuple[int, int, int]:
+    """
+    Gera (ataque, defesa, velocidade) com soma = status_max.
+    Garante que cada um é pelo menos 1.
+    """
+    # ataque entre 1 e status_max - 2
+    ataque = random.randint(1, status_max - 2)
+    restante = status_max - ataque
+
+    defesa = random.randint(1, restante - 1)
+    velocidade = restante - defesa
+
+    return ataque, defesa, velocidade
+
+
+def definir_cor_e_personalidade(ataque: int, defesa: int, velocidade: int) -> tuple[str, str]:
+    """
+    Define cor do robô adversário com base no maior status:
+    - maior = ataque -> vermelho
+    - maior = defesa -> verde
+    - maior = velocidade -> azul
+    - todos iguais -> branco
+    - empate entre dois -> escolhe aleatório entre as cores correspondentes
+
+    Também define personalidade:
+    - ataque maior -> agressivo
+    - defesa maior -> defensivo
+    - velocidade maior -> velocista
+    - empatado -> aleatório entre esses perfis
+    """
+    valores = {"ataque": ataque, "defesa": defesa, "velocidade": velocidade}
+    max_valor = max(valores.values())
+
+    maiores = [k for k, v in valores.items() if v == max_valor]
+
+    cores_map = {
+        "ataque": "vermelho",
+        "defesa": "verde",
+        "velocidade": "azul",
+    }
+
+    if len(maiores) == 3:
+        cor = "branco"
+    elif len(maiores) == 1:
+        cor = cores_map[maiores[0]]
+    else:
+        cor = cores_map[random.choice(maiores)]
+
+    # personalidade
+    if len(maiores) == 1:
+        if maiores[0] == "ataque":
+            personalidade = "agressivo"
+        elif maiores[0] == "defesa":
+            personalidade = "defensivo"
+        else:
+            personalidade = "velocista"
+    else:
+        personalidade = random.choice(["agressivo", "defensivo", "velocista"])
+
+    return cor, personalidade
+
+
+def criar_robo_adversario_procedural(partida: int) -> Robo:
+    status_max = obter_status_maximo(partida)
+    ataque, defesa, velocidade = gerar_stats_aleatorios(status_max)
+    cor, personalidade = definir_cor_e_personalidade(ataque, defesa, velocidade)
+
+    print(f"\n[INFO] Gerando adversário da partida {partida}...")
+    print(
+        f"Status máximo: {status_max} | "
+        f"Ataque: {ataque}, Defesa: {defesa}, Velocidade: {velocidade} | Cor: {cor}"
+    )
+
+    nome = f"Adversário {partida}"
+    return Robo(nome, cor, ataque, defesa, velocidade, personalidade)
+
+
+def aplicar_upgrade(jogador: Robo):
+    """
+    Após cada vitória, jogador escolhe onde aplicar +1 ponto.
+    - ataque: aumenta dano
+    - defesa: aumenta redução de dano e HP máximo (+10)
+    - velocidade: aumenta chance de agir primeiro e mobilidade
+    """
+    print("\n🏅 Você venceu! Ganho de 1 ponto de status.")
+    print("Onde deseja aplicar o ponto?")
+    print("1 - Ataque")
+    print("2 - Defesa")
+    print("3 - Velocidade")
+
+    escolha = input("Digite o número (1/2/3): ").strip()
+
+    if escolha == "1":
+        jogador.ataque += 1
+        print(f"{jogador.nome} agora tem ATAQUE {jogador.ataque}.")
+    elif escolha == "2":
+        jogador.defesa += 1
+        jogador.hp_max += 10
+        jogador.hp_atual += 10
+        if jogador.hp_atual > jogador.hp_max:
+            jogador.hp_atual = jogador.hp_max
+        print(
+            f"{jogador.nome} agora tem DEFESA {jogador.defesa} "
+            f"e HP máximo {jogador.hp_max}."
+        )
+    else:
+        jogador.velocidade += 1
+        print(f"{jogador.nome} agora tem VELOCIDADE {jogador.velocidade}.")
+
+    print(
+        f"Status atual: ATAQUE {jogador.ataque} | "
+        f"DEFESA {jogador.defesa} | VELOCIDADE {jogador.velocidade}"
+    )
 
 
 # -----------------------------------------
@@ -191,7 +315,18 @@ def mostrar_status_terminal(jogador: Robo, adversario: Robo, arena: Arena, turno
     print(f"Distância entre eles: {dist}")
 
 
-def simular_batalha(jogador: Robo, adversario: Robo, arena: Arena, tela, fonte, clock):
+def simular_batalha(
+    jogador: Robo,
+    adversario: Robo,
+    arena: Arena,
+    tela,
+    fonte,
+    clock,
+) -> bool:
+    """
+    Executa uma batalha entre jogador e adversário.
+    Retorna True se o jogador venceu, False se perdeu ou a janela foi fechada.
+    """
     print("\n🔥 A BATALHA VAI COMEÇAR! 🔥")
     print(
         f"{jogador.nome} (HP {jogador.hp_atual})  "
@@ -283,19 +418,68 @@ def simular_batalha(jogador: Robo, adversario: Robo, arena: Arena, tela, fonte, 
 
     print("\n💥 FIM DA BATALHA! 💥")
 
-    if jogador.esta_vivo():
-        print(f"🏆 {jogador.nome} venceu!")
-    else:
+    if not jogador.esta_vivo():
         print(f"🏆 {adversario.nome} venceu!")
+        return False
+
+    if not adversario.esta_vivo():
+        print(f"🏆 {jogador.nome} venceu!")
+        return True
+
+    # Se a janela foi fechada, consideramos como derrota / interrupção
+    print("Jogo interrompido.")
+    return False
+
+
+# -----------------------------------------
+# Campanha de 10 partidas
+# -----------------------------------------
+
+
+def jogar_campanha():
+    arena = criar_arena()
+    jogador = criar_robo_jogador()
+    tela, fonte, clock = iniciar_pygame(arena)
+
+    vitorias = 0
+    total_partidas = 10
+
+    for partida in range(1, total_partidas + 1):
+        print("\n" + "=" * 40)
+        print(f"🎮 INICIANDO PARTIDA {partida} da campanha.")
+        print("=" * 40)
+
+        # Reseta HP do jogador antes da partida
+        jogador.hp_atual = jogador.hp_max
+
+        adversario = criar_robo_adversario_procedural(partida)
+
+        venceu = simular_batalha(jogador, adversario, arena, tela, fonte, clock)
+
+        if not venceu:
+            print(f"\n❌ Você foi derrotado na partida {partida}.")
+            print(f"Vitórias totais: {vitorias}.")
+            break
+
+        vitorias += 1
+
+        if vitorias == total_partidas:
+            print("\n🏆🏆🏆 PARABÉNS! VOCÊ É O CAMPEÃO DO ARIA! 🏆🏆🏆")
+            print(
+                f"Robô: {jogador.nome} | "
+                f"Ataque: {jogador.ataque} | "
+                f"Defesa: {jogador.defesa} | "
+                f"Velocidade: {jogador.velocidade} | "
+                f"HP Máx: {jogador.hp_max}"
+            )
+            break
+
+        # Se venceu e ainda não chegou na última partida, aplica upgrade
+        aplicar_upgrade(jogador)
+
+    print("\nObrigado por jogar ARIA - Arena de Robôs IA!")
+    pygame.quit()
 
 
 def iniciar_jogo():
-    arena = criar_arena()
-    jogador = criar_robo_jogador()
-    adversario = criar_robo_adversario()
-
-    tela, fonte, clock = iniciar_pygame(arena)
-
-    simular_batalha(jogador, adversario, arena, tela, fonte, clock)
-
-    pygame.quit()
+    jogar_campanha()
