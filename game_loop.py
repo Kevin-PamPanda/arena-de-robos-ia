@@ -3,7 +3,7 @@ import time
 
 import pygame
 
-from models import Robo, Arena
+from core.models import Robo, Arena
 
 # -----------------------------------------
 # Criação de robôs e arena
@@ -478,6 +478,19 @@ def jogar_campanha():
         aplicar_upgrade(jogador)
 
     print("\nObrigado por jogar ARIA - Arena de Robôs IA!")
+
+    # 🔹 Novo: manter a janela aberta até o jogador fechar
+    print("A janela do jogo continuará aberta. Feche a janela para encerrar.")
+
+    esperando = True
+    while esperando:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                esperando = False
+
+        # evita usar 100% de CPU
+        clock.tick(30)
+
     pygame.quit()
 
 
